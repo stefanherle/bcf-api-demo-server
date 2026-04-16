@@ -1,11 +1,14 @@
 from dataclasses import dataclass, field
+from datetime import datetime
 from bcf_api import config
 from bcf_api.components.utils.serializer import to_dict
+
 
 @dataclass
 class Project:
     guid: str
     name: str
+    filenames: list[str] = field(default_factory=list, metadata={"serialize": False})
     topics: list["Topic"] = field(default_factory=list, metadata={"shallow": True})
 
     def serialize(

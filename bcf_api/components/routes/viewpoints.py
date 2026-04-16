@@ -77,3 +77,4 @@ def get_snapshot(project_guid, topic_guid, viewpoint_guid):
 
     # PNG direkt ausliefern
     return Response(img_bytes, mimetype="image/png")
+

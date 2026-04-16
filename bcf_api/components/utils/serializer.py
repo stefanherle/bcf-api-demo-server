@@ -17,6 +17,9 @@ def to_dict(obj, seen=None):
     if is_dataclass(obj):
         result = {}
         for f in fields(obj):
+            # Felder mit serialize=False überspringen
+            if f.metadata.get("serialize") is False:
+                continue
             value = getattr(obj, f.name)
 
             # SHALLOW-Felder → nur GUID oder primitive Werte

@@ -1,11 +1,13 @@
 import base64
 import os
 from datetime import datetime
+import logging
+import uuid
 from bcf.bcfxml import load
 
 from bcf_api.components.repositories.data import PROJECTS, TOPICS, COMMENTS, VIEWPOINTS
 from bcf_api.components.models.project import Project
-from bcf_api.components.models.topic import Topic
+from bcf_api.components.models.topic import File, Topic
 from bcf_api.components.models.comment import Comment
 from bcf_api.components.models.viewpoint import (
     Viewpoint,
@@ -19,6 +21,8 @@ from bcf_api.components.models.viewpoint import (
 )
 
 from bcf_api.components.utils.converter import convert_xml_datetime
+
+logger = logging.getLogger()
 
 
 def import_bcf_folder(folder_path="data"):
@@ -38,61 +42,82 @@ def import_bcf_folder(folder_path="data"):
 
 def import_bcfzip(file_path):
     # Projekt anlegen, falls nicht vorhanden
-    
+    try:
+        with load(file_path) as bcf:
+            return import_bcfzip_loaded(bcf, file_path)
+    except Exception as e:
+        logger.error(f"Fehler beim Laden von {file_path}: {e}")
 
-    with load(file_path) as bcf:
-        project_guid = bcf.project.project_id
-        if project_guid not in PROJECTS:
-            PROJECTS[project_guid] = Project(
-                guid=project_guid,
-                name=bcf.project.name
+
+def import_bcfzip_loaded(bcf, file_path):
+    project_guid = bcf.project.project_id if bcf.project is not None else str(uuid.uuid1())
+    project_name = bcf.project.name if bcf.project is not None else file_path.replace(" ", "")
+    filename = os.path.basename(file_path)
+    if project_guid not in PROJECTS:
+        PROJECTS[project_guid] = Project(
+            guid=project_guid,
+            name=project_name,
+            filenames=[filename]
+        )
+    elif filename not in PROJECTS[project_guid].filenames:
+        PROJECTS[project_guid].filenames.append(filename)
+
+    for topic_guid, topic_handler in bcf.topics.items():
+        topic = topic_handler.topic
+        TOPICS[topic.guid] = Topic(
+            guid=topic.guid,
+            server_assigned_id=topic.server_assigned_id,
+            title=topic.title or "Untitled Topic",
+            creation_date=convert_xml_datetime(topic.creation_date) or datetime.utcnow(),
+            creation_author=topic.creation_author,
+
+            topic_type=topic.topic_type,
+            topic_status=topic.topic_status,
+            reference_links=topic.reference_links,
+            priority=topic.priority or None,
+            labels=topic.labels,
+            modified_date=convert_xml_datetime(topic.modified_date) or datetime.utcnow(),
+            modified_author=topic.modified_author,
+            assigned_to=topic.assigned_to,
+            stage=topic.stage,
+            description=topic.description,
+            due_date=convert_xml_datetime(topic.due_date) or None,
+
+            project=PROJECTS[project_guid],
+        )
+        PROJECTS[project_guid].topics.append(TOPICS[topic.guid])
+        
+        for file in topic_handler.header.files.file:
+            new_file = File(
+                filename=file.filename,
+                date=convert_xml_datetime(file.date),
+                reference=file.reference,
+                ifc_project=file.ifc_project,
+                ifc_spatial_structure_element=file.ifc_spatial_structure_element,
+                is_external=file.is_external
             )
+            TOPICS[topic.guid].files.append(new_file)
 
-        for topic_guid, topic_handler in bcf.topics.items():
-            topic = topic_handler.topic
-            TOPICS[topic.guid] = Topic(
-                guid=topic.guid,
-                server_assigned_id=topic.server_assigned_id,
-                title=topic.title or "Untitled Topic",
-                creation_date=convert_xml_datetime(topic.creation_date) or datetime.utcnow(),
-                creation_author=topic.creation_author,
+        idx = 0
+        for vp_guid, vi_handler in topic_handler.viewpoints.items():
+            snapshot_bmp = vi_handler.snapshot
+            visualization_info = vi_handler.visualization_info
+            VIEWPOINTS[visualization_info.guid] = convert_viewpoint(topic.guid, idx, visualization_info, snapshot_bmp=snapshot_bmp)
+            TOPICS[topic.guid].viewpoints.append(VIEWPOINTS[visualization_info.guid])
+            idx=idx+1
 
-                topic_type=topic.topic_type,
-                topic_status=topic.topic_status,
-                reference_links=topic.reference_links,
-                priority=topic.priority or None,
-                labels=topic.labels,
-                modified_date=convert_xml_datetime(topic.modified_date) or datetime.utcnow(),
-                modified_author=topic.modified_author,
-                assigned_to=topic.assigned_to,
-                stage=topic.stage,
-                description=topic.description,
-                due_date=convert_xml_datetime(topic.due_date) or None,
-
-                project=PROJECTS[project_guid],
+        for c in topic_handler.comments:
+            COMMENTS[c.guid] = Comment(
+                guid=c.guid,
+                date=convert_xml_datetime(c.date) or datetime.utcnow(),
+                author=c.author,
+                comment=c.comment or "",
+                modified_date=convert_xml_datetime(c.modified_date) or None,
+                modified_author=c.modified_author or None,
+                topic=TOPICS[topic.guid],
+                viewpoint=VIEWPOINTS[c.viewpoint.guid] or None
             )
-            PROJECTS[project_guid].topics.append(topic)
-
-            idx = 0
-            for vp_guid, vi_handler in topic_handler.viewpoints.items():
-                snapshot_bmp = vi_handler.snapshot
-                visualization_info = vi_handler.visualization_info
-                VIEWPOINTS[visualization_info.guid] = convert_viewpoint(topic.guid, idx, visualization_info, snapshot_bmp=snapshot_bmp)
-                TOPICS[topic.guid].viewpoints.append(VIEWPOINTS[visualization_info.guid])
-                idx=idx+1
-
-            for c in topic_handler.comments:
-                COMMENTS[c.guid] = Comment(
-                    guid=c.guid,
-                    date=convert_xml_datetime(c.date) or datetime.utcnow(),
-                    author=c.author,
-                    comment=c.comment or "",
-                    modified_date=convert_xml_datetime(c.modified_date) or None,
-                    modified_author=c.modified_author or None,
-                    topic=TOPICS[topic.guid],
-                    viewpoint=VIEWPOINTS[c.viewpoint.guid] or None
-                )
-                TOPICS[topic.guid].comments.append(COMMENTS[c.guid])
+            TOPICS[topic.guid].comments.append(COMMENTS[c.guid])
             
             
 

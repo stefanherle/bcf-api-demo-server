@@ -7,6 +7,16 @@ from bcf_api.components.utils.serializer import to_dict
 
 
 @dataclass
+class File:
+    date: datetime
+    filename: str
+    reference: str | None = None
+    ifc_project: str | None = None
+    ifc_spatial_structure_element: str | None = None
+    is_external: bool | None = None
+
+
+@dataclass
 class Topic:
 
     # Required laut Schema
@@ -30,6 +40,7 @@ class Topic:
     due_date: Optional[datetime] = None
     
     project: "Project" = field(default=None, metadata={"shallow": True})
+    files: list["File"] = field(default_factory=list, metadata={"serialize": True})
     viewpoints: List["Viewpoint"] = field(default_factory=list, metadata={"shallow": True})
     comments: List["Comment"] = field(default_factory=list, metadata={"shallow": True})
 
@@ -58,4 +69,13 @@ class Topic:
                 for c in self.comments
             ]
 
+        return data
+    
+    def serialize_files(
+        self,
+        include_navigation_links=config.NAVI_LINKS,
+        api_address=config.API_ADDRESS,
+        relative_links=config.REL_URI
+    ):
+        data = to_dict(self.files)
         return data

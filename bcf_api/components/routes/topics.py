@@ -26,6 +26,7 @@ def get_topics_for_project(project_guid):
     ]
     return jsonify(items)
 
+
 @bp.get("/projects/<project_guid>/topics/<topic_guid>")
 def get_topic_for_project(project_guid, topic_guid):
     topic = TOPICS.get(topic_guid)
@@ -37,3 +38,15 @@ def get_topic_for_project(project_guid, topic_guid):
         return jsonify({"error": "Topic does not belong to this project"})
 
     return jsonify(topic.serialize())
+
+
+@bp.get("/projects/<project_guid>/topics/<topic_guid>/files")
+def get_files_for_topic_for_project(project_guid, topic_guid):
+    topic = TOPICS.get(topic_guid)
+    if not topic:
+        return jsonify({"error": "Topic not found"})
+
+    if topic.project.guid != project_guid:
+        return jsonify({"error": "Topic does not belong to this project"})
+    
+    return jsonify(topic.serialize_files())

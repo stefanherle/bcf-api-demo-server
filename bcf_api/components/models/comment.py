@@ -42,7 +42,7 @@ class Comment:
             if self.viewpoint is not None:
                 data["viewpoint@navigationLink"] = (
                     f"{prefix}{config.API_PATH}/projects/{self.topic.project.guid}"
-                    f"/topics/{self.viewpoint.guid}"
+                    f"/topics/{self.topic.guid}/viewpoints/{self.viewpoint.guid}"
                 )
 
         return data
