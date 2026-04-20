@@ -87,16 +87,17 @@ def import_bcfzip_loaded(bcf, file_path):
         )
         PROJECTS[project_guid].topics.append(TOPICS[topic.guid])
         
-        for file in topic_handler.header.files.file:
-            new_file = File(
-                filename=file.filename,
-                date=convert_xml_datetime(file.date),
-                reference=file.reference,
-                ifc_project=file.ifc_project,
-                ifc_spatial_structure_element=file.ifc_spatial_structure_element,
-                is_external=file.is_external
-            )
-            TOPICS[topic.guid].files.append(new_file)
+        if (files := getattr(getattr(getattr(topic_handler, "header", None), "files", None), "file", None)):
+            for file in files:
+                new_file = File(
+                    filename=file.filename,
+                    date=convert_xml_datetime(file.date),
+                    reference=file.reference,
+                    ifc_project=file.ifc_project,
+                    ifc_spatial_structure_element=file.ifc_spatial_structure_element,
+                    is_external=file.is_external
+                )
+                TOPICS[topic.guid].files.append(new_file)
 
         idx = 0
         for vp_guid, vi_handler in topic_handler.viewpoints.items():
@@ -152,14 +153,14 @@ def convert_viewpoint(topic_guid, index, visualization_info, snapshot_bmp=None):
 
     lines = [
         Line(start_point=l.start_point, end_point=l.end_point)
-        for l in (visualization_info.lines.line or [])
+        for l in (getattr(getattr(visualization_info, "lines", None), "line", None) or [])
     ]
     if len(lines) == 0:
         lines = None
 
     clipping = [
         ClippingPlane(location=cp.location, direction=cp.direction)
-        for cp in (visualization_info.clipping_planes.clipping_plane or [])
+        for cp in (getattr(getattr(visualization_info, "clipping_planes", None), "clipping_plane", None) or [])
     ]
     if len(clipping) == 0:
         clipping = None
@@ -172,7 +173,7 @@ def convert_viewpoint(topic_guid, index, visualization_info, snapshot_bmp=None):
             normal=b.normal,
             up=b.up
         )
-        for b in (visualization_info.bitmaps.bitmap or [])
+        for b in (getattr(getattr(visualization_info, "bitmaps", None), "bitmap", None) or [])
     ]
     if len(bitmaps) == 0:
         bitmaps = None
